@@ -9,6 +9,6 @@ pip install -r requirements.txt
 Benchmark uses `upload` file to test.
 
 ```
-head -c 500K </dev/urandom > upload
+head -c 500000 </dev/urandom > upload
 python benchmark.py
 ```
