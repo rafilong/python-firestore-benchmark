@@ -70,8 +70,9 @@ async def test_async(test_data):
 
 # Testing
 
-data = {"first": "Alan", "middle": "Mathison", "last": "Turing", "born": 1912}
-test_data = [(str(uuid.uuid1()), data) for i in range(NUMBER_DOCS)]
+with open("upload", "rb") as f:
+    data = {"file": f.read()}
+    test_data = [(str(uuid.uuid1()), data) for i in range(NUMBER_DOCS)]
 
 print(f"Sync time {timeit(lambda: test(test_data), number=NUMBER_TRIALS)}")
 print(f"Async time {timeit(lambda: asyncio.run(test_async(test_data)), number=NUMBER_TRIALS)}")
