@@ -10,7 +10,7 @@ SYNC_COLLECTION = "benchmark"
 ASYNC_COLLECTION = "benchmark-async"
 THREAD_COLLECTION = "benchmark-threaded"
 
-NUMBER_DOCS = 10
+NUMBER_DOCS = 100
 NUMBER_TRIALS = 5
 
 
