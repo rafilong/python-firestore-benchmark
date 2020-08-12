@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+import threading
 from timeit import timeit
 
 from google.cloud import firestore
@@ -7,65 +8,72 @@ from google.cloud import firestore
 
 SYNC_COLLECTION = "benchmark"
 ASYNC_COLLECTION = "benchmark-async"
+THREAD_COLLECTION = "benchmark-threaded"
 
-NUMBER_DOCS = 100
-NUMBER_TRIALS = 10
+NUMBER_DOCS = 10
+NUMBER_TRIALS = 5
 
-# Sync Helpers
-
-def add_data(db, doc, data):
-    doc_ref = db.collection(SYNC_COLLECTION).document(doc)
-    return doc_ref.set(data)
-
-def delete_doc(db, doc):
-    return db.collection(SYNC_COLLECTION).document(doc).delete()
-
-
-# Async Helpers
-
-async def async_add_data(db, doc, data):
-    doc_ref = db.collection(ASYNC_COLLECTION).document(doc)
-    return await doc_ref.set(data)
-
-async def async_delete_doc(db, doc):
-    return await db.collection(ASYNC_COLLECTION).document(doc).delete()
-
-
-# Testing Helpers
 
 def test(test_data):
     db = firestore.Client()
-    write_results = []
 
     for name, data in test_data:
-        write_results.append(add_data(db, name, data))
+        write_result = db.collection(SYNC_COLLECTION).document(name).set(data)
+        _ = write_result.update_time
 
-    for result in write_results:
-        _ = result.update_time
-
-    delete_timestamps = []
     for name, _ in test_data:
-        delete_timestamps.append(delete_doc(db, name))
-
-    for timestamp in delete_timestamps:
+        timestamp = db.collection(SYNC_COLLECTION).document(name).delete()
         _ = timestamp.second
 
-async def test_async(test_data):
-    db = firestore.AsyncClient()
-    write_results = []
 
+def test_threaded(test_data):
+    db = firestore.Client()
+
+    threads = {}
+    results = {}
     for name, data in test_data:
-        write_results.append(await async_add_data(db, name, data))
+        threads[name] = threading.Thread(target=add_data, args=(db,name,data,results))
+        threads[name].start()
 
-    for result in write_results:
-        _ = result.update_time
+    for name, _ in test_data:
+        threads[name].join()
+        _ = results[name].update_time
+
+    threads = {}
+    timestamps = {}
+    for name, _ in test_data:
+        threads[name] = threading.Thread(target=delete_doc, args=(db,name,timestamps))
+        threads[name].start()
+
+    for name, _ in test_data:
+        threads[name].join()
+        _ = timestamps[name].second
+
+def add_data(db, doc, data, results):
+    results[doc] = db.collection(SYNC_COLLECTION).document(doc).set(data)
+
+def delete_doc(db, doc, timestamps):
+    timestamps[doc] = db.collection(SYNC_COLLECTION).document(doc).delete()
     
-    delete_timestamps = []
-    for name, _ in test_data:
-        delete_timestamps.append(await async_delete_doc(db, name))
 
-    for timestamp in delete_timestamps:
-        _ = timestamp.second
+
+def test_async(test_data):
+    asyncio.run(test_async_helper(test_data))
+
+async def test_async_helper(test_data):
+    db = firestore.AsyncClient()
+
+    for write_result in asyncio.as_completed([
+        db.collection(ASYNC_COLLECTION).document(name).set(data)
+        for name, data in test_data
+    ]):
+        _ = (await write_result).update_time
+
+    for timestamp in asyncio.as_completed([
+        db.collection(ASYNC_COLLECTION).document(name).delete()
+        for name, _ in test_data
+    ]):
+        _ = (await timestamp).second
 
 
 # Testing
@@ -75,4 +83,5 @@ with open("upload", "rb") as f:
     test_data = [(str(uuid.uuid1()), data) for i in range(NUMBER_DOCS)]
 
 print(f"Sync time {timeit(lambda: test(test_data), number=NUMBER_TRIALS)}")
-print(f"Async time {timeit(lambda: asyncio.run(test_async(test_data)), number=NUMBER_TRIALS)}")
+print(f"Threaded time {timeit(lambda: test_threaded(test_data), number=NUMBER_TRIALS)}")
+print(f"Async time {timeit(lambda: test_async(test_data), number=NUMBER_TRIALS)}")
