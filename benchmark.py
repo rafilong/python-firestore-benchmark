@@ -81,8 +81,8 @@ DOC_SIZE = 500000
 NUM_DOCS = 50
 NUM_TRIALS = 5
 
-for size in [1024, 10*1024, 20*1024, 100*1024, 500*1024]:
-    run_tests(size, NUM_DOCS, NUM_TRIALS)
+# for size in [1024, 10*1024, 20*1024, 100*1024, 500*1024]:
+#     run_tests(size, NUM_DOCS, NUM_TRIALS)
 
 for num in [1, 5, 10, 20, 50]:
     run_tests(DOC_SIZE, num, NUM_TRIALS)
