@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+import os
 from timeit import timeit
 from multiprocessing.pool import ThreadPool
 
@@ -9,9 +10,6 @@ from google.cloud import firestore
 SYNC_COLLECTION = "benchmark"
 ASYNC_COLLECTION = "benchmark-async"
 THREAD_COLLECTION = "benchmark-threaded"
-
-NUMBER_DOCS = 50
-NUMBER_TRIALS = 5
 
 
 def test(test_data):
@@ -70,12 +68,21 @@ async def test_async_helper(test_data):
         _ = (await timestamp).second
 
 
-# Testing
+def run_tests(size, num_docs, num_trials):
+    data = {"data": os.urandom(size)}
+    test_data = [(str(uuid.uuid1()), data) for i in range(num_docs)]
 
-with open("upload", "rb") as f:
-    data = {"file": f.read()}
-    test_data = [(str(uuid.uuid1()), data) for i in range(NUMBER_DOCS)]
+    print(f"sync, {size}, {num_docs}, {num_trials}, {timeit(lambda: test(test_data), number=num_trials)}")
+    print(f"pool, {size}, {num_docs}, {num_trials}, {timeit(lambda: test_threaded(test_data), number=num_trials)}")
+    print(f"async, {size}, {num_docs}, {num_trials}, {timeit(lambda: test_async(test_data), number=num_trials)}")
 
-print(f"Sync time {timeit(lambda: test(test_data), number=NUMBER_TRIALS)}")
-print(f"Threaded time {timeit(lambda: test_threaded(test_data), number=NUMBER_TRIALS)}")
-print(f"Async time {timeit(lambda: test_async(test_data), number=NUMBER_TRIALS)}")
+
+DOC_SIZE = 500000
+NUM_DOCS = 50
+NUM_TRIALS = 5
+
+for size in [1024, 10*1024, 20*1024, 100*1024, 500*1024]:
+    run_tests(size, NUM_DOCS, NUM_TRIALS)
+
+for num in [1, 5, 10, 20, 50]:
+    run_tests(DOC_SIZE, num, NUM_TRIALS)
